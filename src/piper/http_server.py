@@ -1,15 +1,18 @@
 """Flask web server with HTTP API for Piper."""
 
 import argparse
+import functools
 import io
 import json
 import logging
+import os
+import secrets
 import wave
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from urllib.request import urlopen
 
-from flask import Flask, request
+from flask import Flask, request, Response
 
 from . import PiperVoice, SynthesisConfig
 from .download_voices import VOICES_JSON, download_voice
@@ -67,8 +70,19 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
+    parser.add_argument(
+        "--api-key",
+        "--api_key",
+        help="API key for authentication (can also be set via PIPER_API_KEY env var)",
+    )
     args = parser.parse_args()
+
+    api_key = args.api_key or os.environ.get("PIPER_API_KEY")
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    if api_key:
+        _LOGGER.info("API key authentication enabled")
+    else:
+        _LOGGER.warning("No API key configured - server is open to all requests")
     _LOGGER.debug(args)
 
     if not args.download_dir:
@@ -103,7 +117,30 @@ def main() -> None:
     # Create web server
     app = Flask(__name__)
 
+    def require_api_key(f: Callable) -> Callable:
+        """Decorator to require API key authentication."""
+        @functools.wraps(f)
+        def decorated(*args, **kwargs):
+            if api_key is None:
+                return f(*args, **kwargs)
+
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                if secrets.compare_digest(token, api_key):
+                    return f(*args, **kwargs)
+
+            x_api_key = request.headers.get("X-API-Key", "")
+            if x_api_key and secrets.compare_digest(x_api_key, api_key):
+                return f(*args, **kwargs)
+
+            _LOGGER.warning("Unauthorized request from %s", request.remote_addr)
+            return Response("Unauthorized", status=401)
+
+        return decorated
+
     @app.route("/voices", methods=["GET"])
+    @require_api_key
     def app_voices() -> Dict[str, Any]:
         """List downloaded voices.
 
@@ -135,6 +172,7 @@ def main() -> None:
         return voices_dict
 
     @app.route("/all-voices", methods=["GET"])
+    @require_api_key
     def app_all_voices() -> Dict[str, Any]:
         """List all Piper voices.
 
@@ -145,6 +183,7 @@ def main() -> None:
             return json.load(response)
 
     @app.route("/download", methods=["POST"])
+    @require_api_key
     def app_download() -> str:
         """Download a voice.
 
@@ -171,6 +210,7 @@ def main() -> None:
         return model_id
 
     @app.route("/", methods=["POST"])
+    @require_api_key
     def app_synthesize() -> bytes:
         """Synthesize audio from text.
 
