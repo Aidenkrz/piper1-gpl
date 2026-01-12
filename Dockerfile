@@ -18,7 +18,6 @@ RUN script/package
 FROM python:3.12-slim
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
-# API key for authentication (optional)
 ENV PIPER_API_KEY=""
 
 WORKDIR /app
