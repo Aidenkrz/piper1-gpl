@@ -24,7 +24,7 @@ TASHKEEL_DATA_FILES = [
 
 setup(
     name="piper-tts",
-    version="1.3.1",
+    version="1.4.2",
     description="Fast and local neural text-to-speech engine",
     url="http://github.com/OHF-voice/piper1-gpl",
     license="GPL-3.0-or-later",
@@ -44,6 +44,7 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "onnxruntime>=1,<2",
+        "pathvalidate>=3,<4",
     ],
     extras_require={
         "train": [
@@ -52,7 +53,6 @@ setup(
             "tensorboard>=2,<3",
             "tensorboardX>=2,<3",
             "jsonargparse[signatures]>=4.27.7",
-            "pathvalidate>=3,<4",
             "onnx>=1,<2",
             "pysilero-vad>=2.1,<3",
             "cython>=3,<4",
@@ -74,6 +74,13 @@ setup(
         ],
         "alignment": [
             "onnx>=1,<2",
+        ],
+        "zh": [
+            "g2pW>=0.1.1,<1",
+            "sentence-stream>=1.2.1,<2",
+            "unicode-rbnf>=2.4.0,<3",
+            "torch>=2,<3",
+            "requests>=2,<3",
         ],
     },
     packages=["piper", "piper.tashkeel", "piper.train"],
